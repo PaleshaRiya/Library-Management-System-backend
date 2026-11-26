@@ -100,6 +100,53 @@ class RequestRepository:
         connection.close()
         return request_id
 
+    # New functon to handle the transactional creation of a request with atomicity guarantees
+    def create_request_transactional(self, request):
+        """
+        Executes the checkout limit verification, book counter increment,
+        and request insertion inside a single ACID atomic transaction.
+        """
+        connection = sqlite3.connect(self.db_path, timeout=10.0, isolation_level="EXCLUSIVE")
+        cursor = connection.cursor()
+        try:
+            # 1. ATOMIC CHECK & INCREMENT (Row-level invariant guard)
+            # This only increments if the user currently has LESS than 5 books.
+            cursor.execute(
+                "UPDATE user SET currentBooks = currentBooks + 1 WHERE id = ? AND currentBooks < 5",
+                (request.userId,)
+            )
+
+            # If 0 rows were updated, either the user doesn't exist or already has 5 books!
+            if cursor.rowcount == 0:
+                cursor.execute("SELECT id, currentBooks FROM user WHERE id = ?", (request.userId,))
+                user_row = cursor.fetchone()
+                if not user_row:
+                    raise ValueError("User not found")
+                else:
+                    raise ValueError("User already has 5 books issued (concurrent checkout limit reached)")
+
+            # 2. INSERT THE CHECKOUT REQUEST (In the exact same transaction)
+            cursor.execute(
+                """INSERT INTO bookRequest 
+                   (userId, bookId, isApproved, isRejected, isReturned, isRevoked, isBought, rejectionReason, issueDate, returnDate, feedback, rating) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (request.userId, request.bookId, request.isApproved, request.isRejected, 
+                 request.isReturned, request.isRevoked, request.isBought, request.rejectionReason, 
+                 request.issueDate, request.returnDate, request.feedback, request.rating)
+            )
+            request_id = cursor.lastrowid
+
+            # 3. COMMIT BOTH SIMULTANEOUSLY (Atomicity guaranteed: All or Nothing)
+            connection.commit()
+            return request_id
+
+        except Exception as e:
+            # If any failure occurs, rollback completely!
+            connection.rollback()
+            raise e
+        finally:
+            connection.close()
+
     def update_request(self, request):
         connection = sqlite3.connect(self.db_path)
         cursor = connection.cursor()

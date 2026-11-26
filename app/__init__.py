@@ -6,8 +6,12 @@ from app.tasks.celeryworker import celery_init_app
 from celery.schedules import crontab
 
 from app.services.email_service import EmailService
-
 email_service = EmailService()
+
+
+from flask_caching import Cache
+cache = Cache()
+
 
 def create_app():
     app = Flask(__name__)
@@ -74,7 +78,8 @@ def create_app():
     app.register_blueprint(request_bp, url_prefix='/api/request')
     app.register_blueprint(feedback_bp, url_prefix='/api/feedback')
     app.register_blueprint(healthcheck_bp, url_prefix='/api/healthcheck')
-    
+
+    cache.init_app(app)
     return app, celery_app
 
 app, celery_app = create_app()

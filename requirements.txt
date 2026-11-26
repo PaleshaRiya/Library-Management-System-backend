@@ -6,3 +6,4 @@ flask_mail
 flask_cors
 celery
 redis
+flask_caching

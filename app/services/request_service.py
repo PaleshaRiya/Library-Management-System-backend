@@ -11,29 +11,42 @@ class RequestService:
     def get_all_requests(self, filters=None):
         return self.request_repository.get_all_requests(filters)
 
+    # def create_request(self, request_data):
+        
+    #     user = user_service.get_all_users({
+    #         'id': request_data['userId']
+    #     })[0]
+        
+    #     if not user:
+    #         raise ValueError("User not found")
+        
+    #     if user and user.currentBooks >= 5:
+    #         raise ValueError("User already has 5 books issued")
+        
+    #     request = Request(None, request_data['userId'],None, None, request_data['bookId'],None, False, False, False, False,False, False, None, request_data['issueDate'], request_data['returnDate'], None, None)
+        
+    #     if 'isBought' in request_data:
+    #         request.isBought = request_data['isBought']
+        
+    #     bookRequest = self.request_repository.create_request(request)     
+    #     user.currentBooks += 1
+    #     updated = user_service.update_user(user.id, {
+    #         'currentBooks': user.currentBooks
+    #     })
+    #     return bookRequest
+
+
     def create_request(self, request_data):
-        
-        user = user_service.get_all_users({
-            'id': request_data['userId']
-        })[0]
-        
-        if not user:
-            raise ValueError("User not found")
-        
-        if user and user.currentBooks >= 5:
-            raise ValueError("User already has 5 books issued")
-        
-        request = Request(None, request_data['userId'],None, None, request_data['bookId'],None, False, False, False, False,False, False, None, request_data['issueDate'], request_data['returnDate'], None, None)
-        
+        request = Request(
+            None, request_data['userId'], None, None, request_data['bookId'], None, 
+            False, False, False, False, False, False, None, 
+            request_data['issueDate'], request_data['returnDate'], None, None
+        )
         if 'isBought' in request_data:
             request.isBought = request_data['isBought']
-        
-        bookRequest = self.request_repository.create_request(request)     
-        user.currentBooks += 1
-        updated = user_service.update_user(user.id, {
-            'currentBooks': user.currentBooks
-        })
-        return bookRequest
+
+        # Calls the atomic, transactional checkout method
+        return self.request_repository.create_request_transactional(request)
 
     def update_request(self, request_id, request_data):
         existing_request = self.get_all_requests({

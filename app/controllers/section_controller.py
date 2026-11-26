@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify
 from app.services.section_service import SectionService
 from app.decorators import admin_required
+from app import cache
 
 section_bp = Blueprint('section', __name__)
 section_service = SectionService()
 
 @section_bp.route('/', methods=['GET'])
+@cache.cached(timeout=300)  # Caches result in Redis DB 3 for 5 minutes!
 def get_all_sections():
     filters = {
         'name': request.args.get('name'),
@@ -23,6 +25,7 @@ def create_section():
     try:
         section_data = request.json
         section_id = section_service.create_section(section_data)
+        cache.delete_memoized(get_all_sections)  # <--- Clears cache so users see the new section!
         return jsonify({'id': section_id}), 201
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
